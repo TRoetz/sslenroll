@@ -76,3 +76,31 @@ def get_request_certificate(req_id):
     if val is None:
         return None
     return val[0]
+
+
+def get_last_req_ids(n=10):
+    """Returns the last N request tokens and idents."""
+    cursor = _get_db().cursor()
+    cursor.execute('SELECT token, ident FROM certs ORDER BY rowid DESC LIMIT ?',
+                   (n,))
+    for t in cursor.fetchall():
+        yield t
+
+
+def get_request_params(req_id):
+    """Returns the parameters of a given certificate request."""
+    cursor = _get_db().cursor()
+    cursor.execute('SELECT rowid, spki_req, ident FROM certs WHERE token=?',
+                   (req_id,))
+    val = cursor.fetchone()
+    if val is None:
+        return None
+    return val
+
+
+def set_certificate(req_id, cert_b64):
+    """Stores a new certificate for a given request."""
+    db = _get_db()
+    db.execute('UPDATE certs SET cert=? WHERE token=?',
+               (cert_b64, req_id))
+    db.commit()

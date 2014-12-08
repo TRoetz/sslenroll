@@ -99,29 +99,35 @@ def _try_load_ca_cert(path):
     return crt
 
 
-def _generate_ca_cert(path, pkey):
-    """Generates a new certificate and saves it to the given path."""
+def _make_base_cert(pubkey, expires_days, cn, serial):
     crt = crypto.X509()
 
     not_before_time = datetime.datetime.now(datetime.timezone.utc)
-    not_after_time = not_before_time + datetime.timedelta(days=5000)
+    not_after_time = not_before_time + datetime.timedelta(days=expires_days)
 
     crt.set_notBefore(
             not_before_time.strftime('%Y%m%d%H%M%S%z').encode('ascii'))
     crt.set_notAfter(
             not_after_time.strftime('%Y%m%d%H%M%S%z').encode('ascii'))
 
-    issuer = crt.get_issuer()
-    issuer.C = 'XX'
-    issuer.ST = 'Internet'
-    issuer.O = 'SSLEnroll'
-    issuer.CN = socket.gethostname()
+    subject = crt.get_subject()
+    subject.C = 'XX'
+    subject.ST = 'Internet'
+    subject.O = 'SSLEnroll'
+    subject.CN = cn
 
-    crt.set_issuer(issuer)
-    crt.set_subject(issuer)
+    crt.set_subject(subject)
+    crt.set_serial_number(serial)
+    crt.set_pubkey(pubkey)
 
-    crt.set_serial_number(random.randrange(0, 2**64))
-    crt.set_pubkey(pkey)
+    return crt
+
+
+def _generate_ca_cert(path, pkey):
+    """Generates a new certificate and saves it to the given path."""
+    crt = _make_base_cert(pkey, 5000, socket.gethostname(),
+                          random.randrange(0, 2**64))
+    crt.set_issuer(crt.get_subject())
     crt.sign(pkey, 'sha256')
 
     data = crypto.dump_certificate(crypto.FILETYPE_PEM, crt)
@@ -149,3 +155,17 @@ def spki_req_is_valid(spki_req):
         return True
     except Exception:
         return False
+
+
+def make_cert_for_spki_request(spki_req_b64, serial, ident):
+    """Creates a certificate for a given Netscape SPKI request."""
+    spki_obj = netscape_spki_from_b64(spki_req_b64)
+    if spki_obj is None:
+        raise ValueError('Invalid SPKI object')
+
+    root_crt = _try_load_ca_cert(cfg.ca_cert_path())
+    root_key = _try_load_ca_private_key(cfg.ca_private_key_path())
+    crt = _make_base_cert(spki_obj.get_pubkey(), 365, ident, serial)
+    crt.set_issuer(root_crt.get_subject())
+    crt.sign(root_key, 'sha256')
+    return crypto.dump_certificate(crypto.FILETYPE_ASN1, crt)
