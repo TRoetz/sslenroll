@@ -25,6 +25,37 @@ from OpenSSL import crypto
 from sslenroll.config import cfg
 
 
+def netscape_spki_from_b64(b64):
+    """Converts a base64 encoded Netscape SPKI DER to a crypto.NetscapeSPKI.
+
+    PyOpenSSL does not yet support doing that by itself, so some work around
+    through FFI and "internals-patching" trickery is required to perform this
+    conversion. https://github.com/pyca/pyopenssl/issues/177 tracks the issue
+    upstream.
+    """
+    if not hasattr(netscape_spki_from_b64, 'NETSCAPE_SPKI_b64_decode'):
+        from cffi import FFI as CFFI
+        from OpenSSL._util import ffi as _sslffi, lib as _ssllib
+        cffi = CFFI()
+        cffi.cdef('void* NETSCAPE_SPKI_b64_decode(const char *str, int len);')
+        lib = cffi.dlopen('libssl.so')
+        def wrapper(b64, lib=lib):
+            if isinstance(b64, str):
+                b64 = b64.encode('ascii')
+            b64_ptr = _sslffi.new('char[]', b64)
+            spki_obj = lib.NETSCAPE_SPKI_b64_decode(b64_ptr, len(b64))
+            if spki_obj == cffi.NULL:
+                raise ValueError("Invalid SPKI base64")
+            def free(spki_obj, ref=b64_ptr):
+                _ssllib.NETSCAPE_SPKI_free(spki_obj)
+            return _sslffi.gc(spki_obj, free)
+        netscape_spki_from_b64.func = wrapper
+
+    ret = crypto.NetscapeSPKI()
+    ret._spki = netscape_spki_from_b64.func(b64)
+    return ret
+
+
 def _try_load_ca_private_key(path):
     """Checks that the provided private key is usable and returns it."""
     pkey = crypto.load_privatekey(crypto.FILETYPE_PEM, open(path, 'rb').read())
@@ -109,3 +140,12 @@ def initial_setup():
         _try_load_ca_cert(cfg.ca_cert_path())
     else:
         _generate_ca_cert(cfg.ca_cert_path(), pkey)
+
+
+def spki_req_is_valid(spki_req):
+    """Checks if an SPKI request object is properly formatted."""
+    try:
+        netscape_spki_from_b64(spki_req)
+        return True
+    except Exception:
+        return False

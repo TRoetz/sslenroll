@@ -17,12 +17,14 @@ import yaml
 
 
 class Config:
-    def __init__(self, path):
-        self.path = path
-        if path and os.path.exists(path):
+    def __init__(self):
+        self.path = None
+        self.cfg = {}
+
+    def load(self, path):
+        if os.path.exists(path):
+            self.path = path
             self.cfg = yaml.load(open(path))
-        else:
-            self.cfg = {}
 
     def _default(self, default, key):
         """Returns cfg[key[0]][key[1]][...] or default if key is missing."""
@@ -45,6 +47,13 @@ class Config:
         return self._default('/etc/sslenroll/ca.crt',
                              ('ca', 'cert_path'))
 
+    def db_path(self):
+        return self._default('/etc/sslenroll/db.sqlite',
+                             ('db', 'path'))
 
-# Hotsapped at program startup.
-cfg = Config(None)
+    def web_base_path(self):
+        return self._default('/', ('web', 'base_path'))
+
+
+cfg = Config()
+cfg.load('/etc/sslenroll/config.yml')
