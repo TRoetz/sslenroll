@@ -22,7 +22,10 @@ from sslenroll import db
 from sslenroll.config import cfg
 
 def home():
-    return bottle.template('enroll_form', {})
+    params = {
+        'register_url': bottle.url('register'),
+    }
+    return bottle.template('enroll_form', params)
 
 
 def register():
@@ -44,15 +47,16 @@ def register():
 
 
 def register_done(req_id):
-    # TODO(delroth): Web page that polls check_status and installs cert.
-    return 'Foo'
+    params = {
+        'check_url': bottle.url('check_status', req_id=req_id),
+    }
+    return bottle.template('register_done', params)
 
 
 def check_status(req_id):
-    if db.get_request_certificate(req_id):
-        return '{"enrolled":true}'
-    else:
-        return '{"enrolled":false}'
+    enrolled = db.get_request_certificate(req_id) is not None
+    return {'enrolled': db.get_request_certificate(req_id) is not None,
+            'cert_url': bottle.url('get_cert', req_id=req_id)}
 
 
 def get_cert(req_id):

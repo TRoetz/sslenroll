@@ -7,7 +7,7 @@
 
     <body>
         <h1>Enroll your browser</h1>
-        <form method="POST" action="/register">
+        <form method="POST" action="{{ register_url }}">
             <p><label>Browser name (short id) <input type="text" name="ident"></label>
             <p><label>Keypair params <keygen name="spki_req"></label>
             <p><input type="submit">

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>SSLEnroll - waiting</title>
+    </head>
+
+    <body>
+        <h1>Request sent!</h1>
+        <p>Now polling while waiting for enroll confirmation...</p>
+
+        <script type="text/javascript">
+            function is_it_enrolled_yet() {
+                var xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState != 4) {
+                        return;
+                    }
+
+                    if (xhr.status == 200) {
+                        var json = JSON.parse(xhr.responseText);
+                        if (json.enrolled) {
+                            document.write('<p>Enrolled!</p>');
+                            location.href = json.cert_url;
+                            return;
+                        }
+                    }
+
+                    setTimeout(is_it_enrolled_yet, 60000);
+                };
+                xhr.open('GET', '{{ check_url }}', true);
+                xhr.send();
+            }
+
+            is_it_enrolled_yet();
+        </script>
+    </body>
+</html>
