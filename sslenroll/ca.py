@@ -76,6 +76,8 @@ def _generate_ca_private_key(path):
     data = crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey)
     open(path, 'wb').write(data)
 
+    return pkey
+
 
 @functools.lru_cache(None)
 def get_ca_private_key():
